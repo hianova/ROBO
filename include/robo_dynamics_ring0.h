@@ -67,6 +67,20 @@ typedef struct {
     robo_obs_t obs[ROBO_MAX_OBS];
 } robo_state_t;
 
+FLOW_FORCE_INL int64_t robo__sat_add_i64(int64_t a, int64_t b) {
+    flow_i128 s = (flow_i128)a + (flow_i128)b;
+    if (s > (flow_i128)INT64_MAX) return INT64_MAX;
+    if (s < (flow_i128)(INT64_MIN + 1)) return INT64_MIN + 1;
+    return (int64_t)s;
+}
+
+FLOW_FORCE_INL int64_t robo__sat_sub_i64(int64_t a, int64_t b) {
+    flow_i128 d = (flow_i128)a - (flow_i128)b;
+    if (d > (flow_i128)INT64_MAX) return INT64_MAX;
+    if (d < (flow_i128)(INT64_MIN + 1)) return INT64_MIN + 1;
+    return (int64_t)d;
+}
+
 FLOW_FORCE_INL int64_t robo__mul_q16(int64_t a, int64_t b) {
     return flow_sym_shr_i128((flow_i128)a * (flow_i128)b, 16U);
 }
@@ -137,9 +151,9 @@ FLOW_INL void robo_fk2_ring0(int64_t l1_q16, int64_t l2_q16, int64_t th1_q16, in
                              int64_t *ex_q16, int64_t *ey_q16) {
     int64_t s1 = 0, c1 = 0, s12 = 0, c12 = 0;
     robo_sincos_q16(th1_q16, &s1, &c1);
-    robo_sincos_q16(th1_q16 + th2_q16, &s12, &c12);
-    *ex_q16 = robo__mul_q16(l1_q16, c1) + robo__mul_q16(l2_q16, c12);
-    *ey_q16 = robo__mul_q16(l1_q16, s1) + robo__mul_q16(l2_q16, s12);
+    robo_sincos_q16(robo__sat_add_i64(th1_q16, th2_q16), &s12, &c12);
+    *ex_q16 = robo__sat_add_i64(robo__mul_q16(l1_q16, c1), robo__mul_q16(l2_q16, c12));
+    *ey_q16 = robo__sat_add_i64(robo__mul_q16(l1_q16, s1), robo__mul_q16(l2_q16, s12));
 }
 
 /* Compute exact Q16.16 box [ux_lo, ux_hi] respecting actuation, Coulomb friction, and ZMP */

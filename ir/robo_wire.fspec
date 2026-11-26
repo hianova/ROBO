@@ -1,0 +1,15 @@
+# FLOW v10.0.0 ArenaSchema: 64-byte ROBO Ring-0 State Wire Cell
+arena 2 robo_wire build/robo_wire.h robo_wire_cell_t robo_wire_map_t robo_wire_arena_t
+
+layout robo_state_wire robo_state_wire_t
+  field px_q16 0 i64 1
+  field py_q16 64 i64 1
+  field vx_q16 128 i64 1
+  field vy_q16 192 i64 1
+  field ax_cmd_q16 256 i64 1
+  field ay_cmd_q16 320 i64 1
+  field h_margin_q16 384 i64 1
+  field status_u64 448 u64 1
+
+region hdr 0 1 robo_state_wire ROBO_SLOT_HDR -
+region state 1 1 robo_state_wire ROBO_SLOT_STATE -

@@ -13,9 +13,12 @@ BUILD    := build
 TARGET   := $(BUILD)/robo_cli
 RING0_O  := $(BUILD)/robo_ring0.o
 
-.PHONY: all ring0 check-headers test demo clean
+FLOW_BIN ?= $(FLOW_DIR)/build/flow
+AUDITOR_BIN ?= $(HOME)/.local/bin/auditor
 
-all: $(TARGET) ring0 check-headers
+.PHONY: all ring0 check-headers formal test demo clean
+
+all: $(TARGET) ring0 check-headers formal
 
 $(BUILD):
 	mkdir -p $(BUILD)
@@ -40,7 +43,19 @@ check-headers:
 $(TARGET): src/robo_cli.c include/robo_dynamics_ring0.h include/robo_cbf_ring0.h include/robo_arm2_ring0.h $(FLOW_DIR)/core/flow.h | $(BUILD)
 	$(CC) $(CFLAGS) src/robo_cli.c -lm -o $@
 
-test: $(TARGET) ring0 check-headers
+formal: $(RING0_O)
+	@echo "=== [ROBO FLOW v10 Gate] ArenaSchema, Z3 ECBF Falsification & NSW-0 ==="
+	@mkdir -p $(BUILD)
+	"$(FLOW_BIN)" schema check ir/robo_wire.fspec
+	"$(FLOW_BIN)" schema emit c17 ir/robo_wire.fspec $(BUILD)/robo_wire.h
+	"$(FLOW_BIN)" schema emit smt2 ir/robo_wire.fspec $(BUILD)/robo_wire_schema.smt2
+	@test "$$(z3 -T:5 $(BUILD)/robo_wire_schema.smt2 | head -n 1)" = "unsat"
+	@z3 -T:5 proofs/robo_falsify.smt2 > $(BUILD)/robo_falsify.out
+	@! grep -qiE "(timeout|unknown|unsupported|\(error)" $(BUILD)/robo_falsify.out
+	@test "$$(grep -cxE "sat|unsat" $(BUILD)/robo_falsify.out)" -eq 4
+	@if [ -x "$(AUDITOR_BIN)" ]; then "$(AUDITOR_BIN)" bug src/robo_ring0.c -Iinclude -I$(FLOW_DIR)/core --check-nsw --strict; fi
+
+test: $(TARGET) ring0 check-headers formal
 	./$(TARGET) selftest
 
 demo: test

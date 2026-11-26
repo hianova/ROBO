@@ -87,12 +87,12 @@ FLOW_INL bool robo__solve_qp2d_ring0(const robo_halfspace_t *hs, uint32_t m, int
             continue;
         }
         int64_t step = robo__div_q16(viol, n2, FLOW_MAX_Q16);
-        int64_t cx   = ux_nom + robo__mul_q16(step, hs[i].ax_q16);
-        int64_t cy   = uy_nom + robo__mul_q16(step, hs[i].ay_q16);
+        int64_t cx   = robo__sat_add_i64(ux_nom, robo__mul_q16(step, hs[i].ax_q16));
+        int64_t cy   = robo__sat_add_i64(uy_nom, robo__mul_q16(step, hs[i].ay_q16));
         checks += 1U;
         if (robo__feasible_all(hs, m, cx, cy, tol)) {
-            int64_t dx  = cx - ux_nom;
-            int64_t dy  = cy - uy_nom;
+            int64_t dx  = robo__sat_sub_i64(cx, ux_nom);
+            int64_t dy  = robo__sat_sub_i64(cy, uy_nom);
             flow_u128 d2 = (flow_u128)((flow_i128)dx * (flow_i128)dx +
                                        (flow_i128)dy * (flow_i128)dy);
             if (!found || d2 < best_d2) {
@@ -121,8 +121,8 @@ FLOW_INL bool robo__solve_qp2d_ring0(const robo_halfspace_t *hs, uint32_t m, int
             int64_t cy = flow_sym_div128_clamped(flow_shl_i128(ny_q32, 16U), det, FLOW_MAX_Q16);
             checks += 1U;
             if (robo__feasible_all(hs, m, cx, cy, tol)) {
-                int64_t dx   = cx - ux_nom;
-                int64_t dy   = cy - uy_nom;
+                int64_t dx   = robo__sat_sub_i64(cx, ux_nom);
+                int64_t dy   = robo__sat_sub_i64(cy, uy_nom);
                 flow_u128 d2 = (flow_u128)((flow_i128)dx * (flow_i128)dx +
                                            (flow_i128)dy * (flow_i128)dy);
                 if (!found || d2 < best_d2) {
@@ -292,16 +292,16 @@ FLOW_INL robo_safety_cert_t robo_cbf_filter_ring0(const robo_state_t *st, int64_
     } else {
         ux           = flow_sel_i64(ux < ux_lo, ux_lo, flow_sel_i64(ux > ux_hi, ux_hi, ux));
         uy           = flow_sel_i64(uy < uy_lo, uy_lo, flow_sel_i64(uy > uy_hi, uy_hi, uy));
-        bool same    = (flow_abs_i64(ux - u_nom_x_q16) <= INT64_C(8)) &&
-                       (flow_abs_i64(uy - u_nom_y_q16) <= INT64_C(8));
+        bool same    = (flow_abs_i64(robo__sat_sub_i64(ux, u_nom_x_q16)) <= INT64_C(8)) &&
+                       (flow_abs_i64(robo__sat_sub_i64(uy, u_nom_y_q16)) <= INT64_C(8));
         cert.verdict = same ? ROBO_VERDICT_PASS : ROBO_VERDICT_PROJECTED;
     }
 
     int64_t min_margin = FLOW_MAX_Q16;
     uint32_t j;
     for (j = 0U; j < m_ecbf; ++j) {
-        int64_t dot  = robo__mul_q16(hs[j].ax_q16, ux) + robo__mul_q16(hs[j].ay_q16, uy);
-        int64_t marg = dot - hs[j].b_q16;
+        int64_t dot  = robo__sat_add_i64(robo__mul_q16(hs[j].ax_q16, ux), robo__mul_q16(hs[j].ay_q16, uy));
+        int64_t marg = robo__sat_sub_i64(dot, hs[j].b_q16);
         if (marg < min_margin) {
             min_margin = marg;
         }
@@ -311,8 +311,8 @@ FLOW_INL robo_safety_cert_t robo_cbf_filter_ring0(const robo_state_t *st, int64_
     cert.u_safe_y_q16       = uy;
     cert.min_cbf_margin_q16 = min_margin;
 
-    int64_t dxu   = ux - u_nom_x_q16;
-    int64_t dyu   = uy - u_nom_y_q16;
+    int64_t dxu   = robo__sat_sub_i64(ux, u_nom_x_q16);
+    int64_t dyu   = robo__sat_sub_i64(uy, u_nom_y_q16);
     flow_u128 du2 = (flow_u128)((flow_i128)dxu * (flow_i128)dxu +
                                 (flow_i128)dyu * (flow_i128)dyu);
     cert.intervention_norm_q16 = robo__sqrt_q16((uint64_t)du2);

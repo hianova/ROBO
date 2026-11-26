@@ -242,8 +242,8 @@ FLOW_INL robo_arm2_cert_t robo_arm2_cbf_ring0(const robo_arm2_state_t *st, int64
     } else {
         t1           = flow_clamp_sym(t1, st->tau_max_q16);
         t2           = flow_clamp_sym(t2, st->tau_max_q16);
-        bool same    = (flow_abs_i64(t1 - tau1_nom_q16) <= INT64_C(8)) &&
-                       (flow_abs_i64(t2 - tau2_nom_q16) <= INT64_C(8));
+        bool same    = (flow_abs_i64(robo__sat_sub_i64(t1, tau1_nom_q16)) <= INT64_C(8)) &&
+                       (flow_abs_i64(robo__sat_sub_i64(t2, tau2_nom_q16)) <= INT64_C(8));
         cert.verdict = same ? ROBO_VERDICT_PASS : ROBO_VERDICT_PROJECTED;
     }
     cert.tau1_safe_q16 = t1;
