@@ -1,0 +1,49 @@
+name: CI
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  push:
+    branches: [ main, "feat/**", "refactor/**" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  verify-robo:
+    name: ROBO Pure-GPR Ring-0, FLOW v10 Schema, Z3 ECBF & NSW-0 (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    steps:
+      - name: Checkout FLOW (main)
+        uses: actions/checkout@v6
+        with:
+          repository: hianova/FLOW
+          ref: main
+          path: FLOW
+
+      - name: Checkout ROBO
+        uses: actions/checkout@v6
+        with:
+          path: ROBO
+
+      - name: Install Clang & Z3 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang z3
+
+      - name: Install Z3 (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install z3
+
+      - name: Build FLOW & Run ROBO Ring-0, Formal Z3 & Selftest Suite
+        run: |
+          make -C FLOW all LEAN=false CC=clang CXX=clang++
+          make -C ROBO clean
+          make -C ROBO test CC=clang CXX=clang++
